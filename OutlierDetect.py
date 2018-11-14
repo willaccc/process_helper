@@ -3,13 +3,13 @@ import pandas as pd
 import numpy as np
 # distribution check and stats test libraries
 from scipy.stats import shapiro, anderson, normaltest, zscore
+from outliers import smirnov_grubbs as grubbs
 # visualization libraries
 from matplotlib import pyplot as plt
 import seaborn as sns
 
 
 class OutlierDetect(object):
-
     def __init__(self,
                  data,
                  col_index=None):
@@ -88,10 +88,10 @@ class OutlierDetect(object):
         ind_list = []
         # iterate through list to identify z_score over threshold
         for index, element in enumerate(z_score):
+            ind_list.append(0)
             if element >= threshold:
                 ind_list[index] = 1
-            else:
-                ind_list[index] = 0
+
         return ind_list
 
     # non parametric methods
@@ -122,7 +122,7 @@ class OutlierDetect(object):
 
     # median-based z-score using MAD
     def median_z_score(self,
-                       threshold,
+                       threshold=3,
                        quartile_value=0.6745,
                        data=None):
         """
@@ -140,19 +140,17 @@ class OutlierDetect(object):
             pass
 
         median = np.percentile(data, 50)
-        diff = np.sum((data - median)**2, axis=-1)
-        diff = np.sqrt(diff)
+        diff = np.abs(data - median)
         med_abs_deviation = np.median(diff)
 
-        modified_z_score = list(quartile_value * diff / med_abs_deviation)
+        modified_z_score = quartile_value * diff / med_abs_deviation
 
         ind_list = []
         # iterate through list to identify z_score over threshold
         for index, score in enumerate(modified_z_score):
+            ind_list.append(0)
             if score >= threshold:
                 ind_list[index] = 1
-            else:
-                ind_list[index] = 0
 
         return ind_list
 
@@ -163,9 +161,9 @@ class OutlierDetect(object):
                     data=None):
         """
         conduct grubbs test on current data set, can be called iteratively after removing the outliers
-        :param significance_level:
-        :param two_side:
-        :return: boolean, if the max or the min is an outlier or not
+        :param significance_level: decimal, alpha used in determine the significance level
+        :param two_side: boolean, if two-sided grubbs test is conducted
+        :return: list of indices that are recognized as outliers
         """
         # check for alternative data source
         if data is None:
@@ -178,10 +176,22 @@ class OutlierDetect(object):
         # identify min and maximum
         min = np.min(data)
         max = np.max(data)
-        # TODO: finish the grubb test
-        # calculate grubb stats
-        # grubb_stat =
-        return 1
+
+        # set up new list for storing outlier index
+        ind_list = []
+
+        if two_side is True:
+            # two side
+            g_two_side = grubbs.test(data, alpha=significance_level)
+            ind_list = g_two_side
+        else:
+            # one side min
+            g_min = grubbs.min_test_indices(data, alpha=significance_level)
+            # one side max
+            g_max = grubbs.max_test_indices(data, alpha=significance_level)
+            ind_list = [g_min, g_max]
+
+        return ind_list
 
     # multivariate group
 
@@ -217,7 +227,6 @@ class OutlierDetect(object):
         return ind_joint
 
 
-    # dbscan
-    # local outlier
-    # isolation forest
-
+        # dbscan
+        # local outlier
+        # isolation forest
